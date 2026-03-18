@@ -284,11 +284,18 @@ export class TelegramChannel implements Channel {
         fs.mkdirSync(attachDir, { recursive: true });
 
         // Cleanup attachments older than 7 days
-        const parentDir = path.join(GROUPS_DIR, group.folder, 'user_attachments');
+        const parentDir = path.join(
+          GROUPS_DIR,
+          group.folder,
+          'user_attachments',
+        );
         const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
         for (const dir of fs.readdirSync(parentDir)) {
           if (parseInt(dir) < cutoff) {
-            fs.rmSync(path.join(parentDir, dir), { recursive: true, force: true });
+            fs.rmSync(path.join(parentDir, dir), {
+              recursive: true,
+              force: true,
+            });
           }
         }
 
@@ -301,7 +308,10 @@ export class TelegramChannel implements Channel {
         // Return container-relative path
         return `/workspace/group/attachments/${ts}/${filename}`;
       } catch (err) {
-        logger.error({ err, fileId, filename }, 'Failed to download Telegram file');
+        logger.error(
+          { err, fileId, filename },
+          'Failed to download Telegram file',
+        );
         return null;
       }
     };
@@ -359,19 +369,39 @@ export class TelegramChannel implements Channel {
     this.bot.on('message:photo', async (ctx) => {
       const photos = ctx.message.photo;
       const largest = photos[photos.length - 1];
-      await storeNonText(ctx, '[Photo]', largest.file_id, `photo_${largest.file_unique_id}.jpg`);
+      await storeNonText(
+        ctx,
+        '[Photo]',
+        largest.file_id,
+        `photo_${largest.file_unique_id}.jpg`,
+      );
     });
     this.bot.on('message:video', async (ctx) => {
       const video = ctx.message.video;
-      await storeNonText(ctx, '[Video]', video.file_id, video.file_name || `video_${video.file_unique_id}.mp4`);
+      await storeNonText(
+        ctx,
+        '[Video]',
+        video.file_id,
+        video.file_name || `video_${video.file_unique_id}.mp4`,
+      );
     });
     this.bot.on('message:voice', async (ctx) => {
       const voice = ctx.message.voice;
-      await storeNonText(ctx, '[Voice message]', voice.file_id, `voice_${voice.file_unique_id}.ogg`);
+      await storeNonText(
+        ctx,
+        '[Voice message]',
+        voice.file_id,
+        `voice_${voice.file_unique_id}.ogg`,
+      );
     });
     this.bot.on('message:audio', async (ctx) => {
       const audio = ctx.message.audio;
-      await storeNonText(ctx, '[Audio]', audio.file_id, audio.file_name || `audio_${audio.file_unique_id}.mp3`);
+      await storeNonText(
+        ctx,
+        '[Audio]',
+        audio.file_id,
+        audio.file_name || `audio_${audio.file_unique_id}.mp3`,
+      );
     });
     this.bot.on('message:document', async (ctx) => {
       const doc = ctx.message.document;
@@ -452,7 +482,11 @@ export class TelegramChannel implements Channel {
     }
   }
 
-  async sendFile(jid: string, filePath: string, caption?: string): Promise<void> {
+  async sendFile(
+    jid: string,
+    filePath: string,
+    caption?: string,
+  ): Promise<void> {
     if (!this.bot) {
       logger.warn('Telegram bot not initialized');
       return;

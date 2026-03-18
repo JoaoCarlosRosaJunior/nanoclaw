@@ -85,8 +85,11 @@ export function startIpcWatcher(deps: IpcDeps): void {
             try {
               const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
               // Authorization check shared by message and file IPC
-              const targetGroup = data.chatJid ? registeredGroups[data.chatJid] : undefined;
-              const isAuthorized = isMain || (targetGroup && targetGroup.folder === sourceGroup);
+              const targetGroup = data.chatJid
+                ? registeredGroups[data.chatJid]
+                : undefined;
+              const isAuthorized =
+                isMain || (targetGroup && targetGroup.folder === sourceGroup);
 
               if (data.type === 'message' && data.chatJid && data.text) {
                 if (isAuthorized) {
@@ -120,14 +123,24 @@ export function startIpcWatcher(deps: IpcDeps): void {
                   const containerPrefix = '/workspace/group/';
                   let hostPath: string;
                   if (data.path.startsWith(containerPrefix)) {
-                    hostPath = path.join(GROUPS_DIR, sourceGroup, data.path.slice(containerPrefix.length));
+                    hostPath = path.join(
+                      GROUPS_DIR,
+                      sourceGroup,
+                      data.path.slice(containerPrefix.length),
+                    );
                   } else {
                     hostPath = data.path;
                   }
 
                   if (!fs.existsSync(hostPath)) {
-                    logger.warn({ hostPath, sourceGroup }, 'IPC file not found');
-                    await deps.sendMessage(data.chatJid, `File not found: ${data.path}`);
+                    logger.warn(
+                      { hostPath, sourceGroup },
+                      'IPC file not found',
+                    );
+                    await deps.sendMessage(
+                      data.chatJid,
+                      `File not found: ${data.path}`,
+                    );
                   } else {
                     const stat = fs.statSync(hostPath);
                     if (stat.size > MAX_FILE_SIZE) {
@@ -136,10 +149,16 @@ export function startIpcWatcher(deps: IpcDeps): void {
                         data.chatJid,
                         `File exceeds 50MB limit (${sizeMB}MB). Available on server at: ${hostPath}`,
                       );
-                      logger.warn({ hostPath, sizeMB, sourceGroup }, 'IPC file too large');
+                      logger.warn(
+                        { hostPath, sizeMB, sourceGroup },
+                        'IPC file too large',
+                      );
                     } else {
                       await deps.sendFile(data.chatJid, hostPath, data.caption);
-                      logger.info({ chatJid: data.chatJid, hostPath, sourceGroup }, 'IPC file sent');
+                      logger.info(
+                        { chatJid: data.chatJid, hostPath, sourceGroup },
+                        'IPC file sent',
+                      );
                     }
                   }
                 } else {

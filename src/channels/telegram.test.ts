@@ -155,12 +155,25 @@ function createMediaCtx(overrides: {
       caption: overrides.caption,
       photo: [
         { file_id: 'photo_small', file_unique_id: 'ps', width: 90, height: 90 },
-        { file_id: 'photo_large', file_unique_id: 'pl', width: 800, height: 600 },
+        {
+          file_id: 'photo_large',
+          file_unique_id: 'pl',
+          width: 800,
+          height: 600,
+        },
       ],
       video: { file_id: 'vid1', file_unique_id: 'vu1', file_name: 'video.mp4' },
       voice: { file_id: 'voice1', file_unique_id: 'vo1' },
-      audio: { file_id: 'audio1', file_unique_id: 'au1', file_name: 'song.mp3' },
-      document: { file_id: 'doc1', file_unique_id: 'du1', file_name: 'file.pdf' },
+      audio: {
+        file_id: 'audio1',
+        file_unique_id: 'au1',
+        file_name: 'song.mp3',
+      },
+      document: {
+        file_id: 'doc1',
+        file_unique_id: 'du1',
+        file_name: 'file.pdf',
+      },
       sticker: { emoji: '😀' },
       ...(overrides.extra || {}),
     },
