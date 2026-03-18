@@ -10,6 +10,8 @@ const envConfig = readEnvFile([
   'ASSISTANT_NAME',
   'ASSISTANT_HAS_OWN_NUMBER',
   'TELEGRAM_BOT_POOL',
+  'MAX_CONCURRENT_CONTAINERS',
+  'ATTACHMENT_RETENTION_DAYS',
 ]);
 
 export const ASSISTANT_NAME =
@@ -59,8 +61,11 @@ export const IPC_POLL_INTERVAL = 1000;
 export const IDLE_TIMEOUT = parseInt(process.env.IDLE_TIMEOUT || '1800000', 10); // 30min default — how long to keep container alive after last result
 export const MAX_CONCURRENT_CONTAINERS = Math.max(
   1,
-  parseInt(process.env.MAX_CONCURRENT_CONTAINERS || '5', 10) || 5,
+  parseInt(process.env.MAX_CONCURRENT_CONTAINERS || envConfig.MAX_CONCURRENT_CONTAINERS || '5', 10) || 5,
 );
+export const ATTACHMENT_RETENTION_DAYS = parseInt(
+  process.env.ATTACHMENT_RETENTION_DAYS || envConfig.ATTACHMENT_RETENTION_DAYS || '7', 10,
+) || 7;
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

@@ -24,14 +24,20 @@ RUN apt-get update && apt-get install -y \
     libxshmfence1 \
     curl \
     git \
+    python3-pip \
+    pandoc \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Python packages for document processing (pdf, xlsx, data)
+RUN pip3 install --no-cache-dir --break-system-packages \
+    openpyxl pypdf pdfplumber reportlab pandas Pillow "markitdown[pptx]"
 
 # Set Chromium path for agent-browser
 ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
 
-# Install agent-browser, claude-code, and Google Workspace CLI globally
-RUN npm install -g agent-browser @anthropic-ai/claude-code @googleworkspace/cli
+# Install agent-browser, claude-code, Google Workspace CLI, and document tools globally
+RUN npm install -g agent-browser @anthropic-ai/claude-code @googleworkspace/cli docx pptxgenjs
 
 # gws uses encrypted credentials — containers don't have OS keyring
 ENV GOOGLE_WORKSPACE_CLI_KEYRING_BACKEND=file
