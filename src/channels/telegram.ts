@@ -3,7 +3,12 @@ import https from 'https';
 import path from 'path';
 import { Api, Bot, InputFile } from 'grammy';
 
-import { ASSISTANT_NAME, ATTACHMENT_RETENTION_DAYS, GROUPS_DIR, TRIGGER_PATTERN } from '../config.js';
+import {
+  ASSISTANT_NAME,
+  ATTACHMENT_RETENTION_DAYS,
+  GROUPS_DIR,
+  TRIGGER_PATTERN,
+} from '../config.js';
 import { readEnvFile } from '../env.js';
 import { logger } from '../logger.js';
 import { registerChannel, ChannelOpts } from './registry.js';
@@ -289,7 +294,8 @@ export class TelegramChannel implements Channel {
           group.folder,
           'user_attachments',
         );
-        const cutoff = Date.now() - ATTACHMENT_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+        const cutoff =
+          Date.now() - ATTACHMENT_RETENTION_DAYS * 24 * 60 * 60 * 1000;
         for (const dir of fs.readdirSync(parentDir)) {
           if (parseInt(dir) < cutoff) {
             fs.rmSync(path.join(parentDir, dir), {
