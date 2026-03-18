@@ -36,7 +36,7 @@ When working as a sub-agent or teammate, only use `send_message` if instructed t
 
 ## Your Workspace
 
-Files you create are saved in `/workspace/group/`. Use this for notes, research, or anything that should persist.
+Save all files you create in `/workspace/group/agent_attachments/`. Organize in subdirectories by purpose (e.g., `/workspace/group/agent_attachments/reports/`, `/workspace/group/agent_attachments/data/`, `/workspace/group/agent_attachments/{whatever you want}/`). Never save files directly in the root of `/workspace/group/`.
 
 ## Memory
 
@@ -56,6 +56,24 @@ NEVER use markdown. Only use WhatsApp/Telegram formatting:
 - ```triple backticks``` for code
 
 No ## headings. No [links](url). No **double stars**.
+
+## Sending Files
+
+Use `mcp__nanoclaw__send_file` to send files to the user:
+- `send_file({ path: "/workspace/group/agent_attachments/reports/report.csv", caption: "Monthly report" })`
+- Supported: any file type. Images show inline in Telegram, others as downloadable files.
+- Max size: 50MB. Larger files cannot be sent — tell the user the server path instead.
+
+## Receiving Files
+
+When users send files, you'll see them in the message as:
+`[File: /workspace/group/user_attachments/{timestamp}/filename.ext] optional caption`
+
+Use the Read tool to view the file contents. When editing a received file, save your work to `/workspace/group/agent_attachments/` — not back to the user_attachments folder. User attachments are temporary and cleaned up after 7 days.
+
+## Model Selection
+
+If the user asks you to change your model (e.g., "switch to sonnet", "use haiku", "change model to opus"), update your settings file at `/home/node/.claude/settings.json`. Add or update the `"model"` field with the full model ID string (e.g., `"claude-sonnet-4-6"`). Before setting the value, use WebSearch to find the latest model ID for the requested model category (Sonnet, Opus, or Haiku) from the Anthropic documentation. Model IDs change over time as new versions are released. Confirm the change and let the user know it will take effect on the next message after the current session ends.
 
 ## Google Workspace Access
 

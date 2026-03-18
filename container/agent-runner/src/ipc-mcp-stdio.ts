@@ -63,6 +63,29 @@ server.tool(
 );
 
 server.tool(
+  'send_file',
+  'Send a file to the user or group. Use for sharing generated files, reports, images, spreadsheets, etc. The file must exist in your workspace.',
+  {
+    path: z.string().describe('Absolute path to the file (e.g., /workspace/group/report.csv)'),
+    caption: z.string().optional().describe('Optional caption or description for the file'),
+  },
+  async (args) => {
+    const data: Record<string, string | undefined> = {
+      type: 'file',
+      chatJid,
+      path: args.path,
+      caption: args.caption || undefined,
+      groupFolder,
+      timestamp: new Date().toISOString(),
+    };
+
+    writeIpcFile(MESSAGES_DIR, data);
+
+    return { content: [{ type: 'text' as const, text: 'File sent.' }] };
+  },
+);
+
+server.tool(
   'schedule_task',
   `Schedule a recurring or one-time task. The task will run as a full agent with access to all tools. Returns the task ID for future reference. To modify an existing task, use update_task instead.
 

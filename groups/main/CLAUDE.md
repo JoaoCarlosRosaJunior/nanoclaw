@@ -247,6 +247,10 @@ The task will run in that group's context with access to their files and memory.
 
 ---
 
+## Model Selection
+
+If the user asks you to change your model (e.g., "switch to sonnet", "use haiku", "change model to opus"), update your settings file at `/home/node/.claude/settings.json`. Add or update the `"model"` field with the full model ID string (e.g., `"claude-sonnet-4-6"`). Before setting the value, use WebSearch to find the latest model ID for the requested model category (Sonnet, Opus, or Haiku) from the Anthropic documentation. Model IDs change over time as new versions are released. Confirm the change and let the user know it will take effect on the next message after the current session ends.
+
 ## Google Workspace Access
 
 See `/workspace/project/groups/global/CLAUDE.md` for Google Workspace CLI reference and permissions.

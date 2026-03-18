@@ -16,8 +16,13 @@ import { isValidGroupFolder } from './group-folder.js';
 import { logger } from './logger.js';
 import { RegisteredGroup } from './types.js';
 
+import { GROUPS_DIR } from './config.js';
+
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+
 export interface IpcDeps {
   sendMessage: (jid: string, text: string) => Promise<void>;
+  sendFile: (jid: string, filePath: string, caption?: string) => Promise<void>;
   registeredGroups: () => Record<string, RegisteredGroup>;
   registerGroup: (jid: string, group: RegisteredGroup) => void;
   syncGroups: (force: boolean) => Promise<void>;
@@ -79,13 +84,12 @@ export function startIpcWatcher(deps: IpcDeps): void {
             const filePath = path.join(messagesDir, file);
             try {
               const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+              // Authorization check shared by message and file IPC
+              const targetGroup = data.chatJid ? registeredGroups[data.chatJid] : undefined;
+              const isAuthorized = isMain || (targetGroup && targetGroup.folder === sourceGroup);
+
               if (data.type === 'message' && data.chatJid && data.text) {
-                // Authorization: verify this group can send to this chatJid
-                const targetGroup = registeredGroups[data.chatJid];
-                if (
-                  isMain ||
-                  (targetGroup && targetGroup.folder === sourceGroup)
-                ) {
+                if (isAuthorized) {
                   if (
                     data.sender &&
                     data.chatJid.startsWith('tg:') &&
@@ -108,6 +112,40 @@ export function startIpcWatcher(deps: IpcDeps): void {
                   logger.warn(
                     { chatJid: data.chatJid, sourceGroup },
                     'Unauthorized IPC message attempt blocked',
+                  );
+                }
+              } else if (data.type === 'file' && data.chatJid && data.path) {
+                if (isAuthorized) {
+                  // Translate container path to host path
+                  const containerPrefix = '/workspace/group/';
+                  let hostPath: string;
+                  if (data.path.startsWith(containerPrefix)) {
+                    hostPath = path.join(GROUPS_DIR, sourceGroup, data.path.slice(containerPrefix.length));
+                  } else {
+                    hostPath = data.path;
+                  }
+
+                  if (!fs.existsSync(hostPath)) {
+                    logger.warn({ hostPath, sourceGroup }, 'IPC file not found');
+                    await deps.sendMessage(data.chatJid, `File not found: ${data.path}`);
+                  } else {
+                    const stat = fs.statSync(hostPath);
+                    if (stat.size > MAX_FILE_SIZE) {
+                      const sizeMB = Math.round(stat.size / 1024 / 1024);
+                      await deps.sendMessage(
+                        data.chatJid,
+                        `File exceeds 50MB limit (${sizeMB}MB). Available on server at: ${hostPath}`,
+                      );
+                      logger.warn({ hostPath, sizeMB, sourceGroup }, 'IPC file too large');
+                    } else {
+                      await deps.sendFile(data.chatJid, hostPath, data.caption);
+                      logger.info({ chatJid: data.chatJid, hostPath, sourceGroup }, 'IPC file sent');
+                    }
+                  }
+                } else {
+                  logger.warn(
+                    { chatJid: data.chatJid, sourceGroup },
+                    'Unauthorized IPC file attempt blocked',
                   );
                 }
               }

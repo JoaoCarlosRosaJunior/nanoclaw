@@ -1,7 +1,9 @@
+import fs from 'fs';
 import https from 'https';
-import { Api, Bot } from 'grammy';
+import path from 'path';
+import { Api, Bot, InputFile } from 'grammy';
 
-import { ASSISTANT_NAME, TRIGGER_PATTERN } from '../config.js';
+import { ASSISTANT_NAME, GROUPS_DIR, TRIGGER_PATTERN } from '../config.js';
 import { readEnvFile } from '../env.js';
 import { logger } from '../logger.js';
 import { registerChannel, ChannelOpts } from './registry.js';
@@ -257,8 +259,60 @@ export class TelegramChannel implements Channel {
       );
     });
 
-    // Handle non-text messages with placeholders so the agent knows something was sent
-    const storeNonText = (ctx: any, placeholder: string) => {
+    // Download a Telegram file to the group's user_attachments folder
+    const downloadFile = async (
+      ctx: any,
+      fileId: string,
+      filename: string,
+    ): Promise<string | null> => {
+      const chatJid = `tg:${ctx.chat.id}`;
+      const group = this.opts.registeredGroups()[chatJid];
+      if (!group) return null;
+
+      try {
+        const file = await ctx.api.getFile(fileId);
+        if (!file.file_path) return null;
+
+        const url = `https://api.telegram.org/file/bot${this.botToken}/${file.file_path}`;
+        const ts = Date.now().toString();
+        const attachDir = path.join(
+          GROUPS_DIR,
+          group.folder,
+          'user_attachments',
+          ts,
+        );
+        fs.mkdirSync(attachDir, { recursive: true });
+
+        // Cleanup attachments older than 7 days
+        const parentDir = path.join(GROUPS_DIR, group.folder, 'user_attachments');
+        const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        for (const dir of fs.readdirSync(parentDir)) {
+          if (parseInt(dir) < cutoff) {
+            fs.rmSync(path.join(parentDir, dir), { recursive: true, force: true });
+          }
+        }
+
+        const destPath = path.join(attachDir, filename);
+        const resp = await fetch(url);
+        if (!resp.ok) return null;
+        const buffer = Buffer.from(await resp.arrayBuffer());
+        fs.writeFileSync(destPath, buffer);
+
+        // Return container-relative path
+        return `/workspace/group/attachments/${ts}/${filename}`;
+      } catch (err) {
+        logger.error({ err, fileId, filename }, 'Failed to download Telegram file');
+        return null;
+      }
+    };
+
+    // Handle non-text messages: download file and include path in message
+    const storeNonText = async (
+      ctx: any,
+      fallbackPlaceholder: string,
+      fileId?: string,
+      filename?: string,
+    ) => {
       const chatJid = `tg:${ctx.chat.id}`;
       const group = this.opts.registeredGroups()[chatJid];
       if (!group) return;
@@ -280,28 +334,53 @@ export class TelegramChannel implements Channel {
         'telegram',
         isGroup,
       );
+
+      let content: string;
+      if (fileId && filename) {
+        const filePath = await downloadFile(ctx, fileId, filename);
+        content = filePath
+          ? `[File: ${filePath}]${caption}`
+          : `${fallbackPlaceholder}${caption}`;
+      } else {
+        content = `${fallbackPlaceholder}${caption}`;
+      }
+
       this.opts.onMessage(chatJid, {
         id: ctx.message.message_id.toString(),
         chat_jid: chatJid,
         sender: ctx.from?.id?.toString() || '',
         sender_name: senderName,
-        content: `${placeholder}${caption}`,
+        content,
         timestamp,
         is_from_me: false,
       });
     };
 
-    this.bot.on('message:photo', (ctx) => storeNonText(ctx, '[Photo]'));
-    this.bot.on('message:video', (ctx) => storeNonText(ctx, '[Video]'));
-    this.bot.on('message:voice', (ctx) => storeNonText(ctx, '[Voice message]'));
-    this.bot.on('message:audio', (ctx) => storeNonText(ctx, '[Audio]'));
-    this.bot.on('message:document', (ctx) => {
-      const name = ctx.message.document?.file_name || 'file';
-      storeNonText(ctx, `[Document: ${name}]`);
+    this.bot.on('message:photo', async (ctx) => {
+      const photos = ctx.message.photo;
+      const largest = photos[photos.length - 1];
+      await storeNonText(ctx, '[Photo]', largest.file_id, `photo_${largest.file_unique_id}.jpg`);
     });
-    this.bot.on('message:sticker', (ctx) => {
+    this.bot.on('message:video', async (ctx) => {
+      const video = ctx.message.video;
+      await storeNonText(ctx, '[Video]', video.file_id, video.file_name || `video_${video.file_unique_id}.mp4`);
+    });
+    this.bot.on('message:voice', async (ctx) => {
+      const voice = ctx.message.voice;
+      await storeNonText(ctx, '[Voice message]', voice.file_id, `voice_${voice.file_unique_id}.ogg`);
+    });
+    this.bot.on('message:audio', async (ctx) => {
+      const audio = ctx.message.audio;
+      await storeNonText(ctx, '[Audio]', audio.file_id, audio.file_name || `audio_${audio.file_unique_id}.mp3`);
+    });
+    this.bot.on('message:document', async (ctx) => {
+      const doc = ctx.message.document;
+      const name = doc?.file_name || 'file';
+      await storeNonText(ctx, `[Document: ${name}]`, doc.file_id, name);
+    });
+    this.bot.on('message:sticker', async (ctx) => {
       const emoji = ctx.message.sticker?.emoji || '';
-      storeNonText(ctx, `[Sticker ${emoji}]`);
+      await storeNonText(ctx, `[Sticker ${emoji}]`);
     });
     this.bot.on('message:location', (ctx) => storeNonText(ctx, '[Location]'));
     this.bot.on('message:contact', (ctx) => storeNonText(ctx, '[Contact]'));
@@ -370,6 +449,33 @@ export class TelegramChannel implements Channel {
       this.bot.stop();
       this.bot = null;
       logger.info('Telegram bot stopped');
+    }
+  }
+
+  async sendFile(jid: string, filePath: string, caption?: string): Promise<void> {
+    if (!this.bot) {
+      logger.warn('Telegram bot not initialized');
+      return;
+    }
+
+    try {
+      const numericId = jid.replace(/^tg:/, '');
+      const file = new InputFile(filePath, path.basename(filePath));
+      const opts = caption ? { caption } : {};
+
+      // Auto-detect images for inline rendering
+      const ext = path.extname(filePath).toLowerCase();
+      const imageExts = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
+
+      if (imageExts.has(ext)) {
+        await this.bot.api.sendPhoto(numericId, file, opts);
+      } else {
+        await this.bot.api.sendDocument(numericId, file, opts);
+      }
+
+      logger.info({ jid, filePath, caption }, 'Telegram file sent');
+    } catch (err) {
+      logger.error({ jid, filePath, err }, 'Failed to send Telegram file');
     }
   }
 
