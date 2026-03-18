@@ -4,6 +4,7 @@
  */
 import { ChildProcess, exec, spawn } from 'child_process';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 import {
@@ -113,6 +114,16 @@ function buildVolumeMounts(
     }
   }
 
+  // Mount Google Workspace CLI credentials (read-only — agents can't modify auth)
+  const gwsConfigDir = path.join(os.homedir(), '.config', 'gws');
+  if (fs.existsSync(gwsConfigDir)) {
+    mounts.push({
+      hostPath: gwsConfigDir,
+      containerPath: '/home/node/.config/gws',
+      readonly: true,
+    });
+  }
+
   // Per-group Claude sessions directory (isolated from other groups)
   // Each group gets their own .claude/ to prevent cross-group session access
   const groupSessionsDir = path.join(
@@ -138,6 +149,24 @@ function buildVolumeMounts(
             // Enable Claude's memory feature (persists user preferences between sessions)
             // https://code.claude.com/docs/en/memory#manage-auto-memory
             CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0',
+          },
+          permissions: {
+            deny: [
+              'Bash(gws gmail * send *)',
+              'Bash(gws gmail * delete *)',
+              'Bash(gws gmail * trash *)',
+              'Bash(gws gmail * modify *)',
+              'Bash(gws gmail * insert *)',
+              'Bash(gws drive * delete *)',
+              'Bash(gws drive * trash *)',
+              'Bash(gws calendar * delete *)',
+              'Bash(gws calendar * insert *)',
+              'Bash(gws calendar * update *)',
+              'Bash(gws calendar * patch *)',
+              'Bash(gws docs * delete *)',
+              'Bash(gws sheets * delete *)',
+              'Bash(gws slides * delete *)',
+            ],
           },
         },
         null,
